@@ -13,10 +13,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.config import get_settings
-from app.models.database import get_db, Document as DBDocument, DocumentChunk as DBChunk
+from app.models.database import get_db, Document as DBDocument, DocumentChunk as DBChunk, User
 from app.models.schemas import (
     DocumentUploadResponse, DocumentResponse, DocumentChunkResponse, ChunkCounts
 )
+from app.services.auth import get_current_user
 from app.services.ingestion import ingest_document, delete_document
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,7 @@ async def upload_document(
     file: UploadFile = File(...),
     tags: str = Form(default=""),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Upload and ingest a document.
@@ -100,6 +102,7 @@ async def upload_document(
     # Create DB record immediately (status=processing)
     db_doc = DBDocument(
         id=document_id,
+        user_id=current_user.id,
         filename=safe_filename,
         original_filename=filename,
         file_type=ext.lstrip("."),
@@ -122,6 +125,7 @@ async def upload_document(
                     file_type=ext.lstrip("."),
                     file_size=file_size,
                     tags=tag_list,
+                    user_id=current_user.id,
                     db=bg_db,
                 )
             except Exception as e:
@@ -145,20 +149,29 @@ async def upload_document(
 
 
 @router.get("", response_model=list[DocumentResponse])
-async def list_documents(db: AsyncSession = Depends(get_db)):
+async def list_documents(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """List all ingested documents."""
     result = await db.execute(
-        select(DBDocument).order_by(DBDocument.upload_date.desc())
+        select(DBDocument)
+        .where(DBDocument.user_id == current_user.id)
+        .order_by(DBDocument.upload_date.desc())
     )
     docs = result.scalars().all()
     return [_doc_to_response(doc) for doc in docs]
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)
-async def get_document(document_id: str, db: AsyncSession = Depends(get_db)):
+async def get_document(
+    document_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Get a specific document by ID."""
     doc = await db.get(DBDocument, document_id)
-    if not doc:
+    if not doc or doc.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Document not found")
     return _doc_to_response(doc)
 
@@ -168,8 +181,13 @@ async def get_document_chunks(
     document_id: str,
     strategy: str = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Get all chunks for a document, optionally filtered by strategy."""
+    doc = await db.get(DBDocument, document_id)
+    if not doc or doc.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Document not found")
+
     query = select(DBChunk).where(DBChunk.document_id == document_id)
     if strategy:
         query = query.where(DBChunk.strategy == strategy)
@@ -177,9 +195,6 @@ async def get_document_chunks(
 
     result = await db.execute(query)
     chunks = result.scalars().all()
-
-    if not chunks and not await db.get(DBDocument, document_id):
-        raise HTTPException(status_code=404, detail="Document not found")
 
     return [
         DocumentChunkResponse(
@@ -203,10 +218,11 @@ async def get_document_chunks(
 async def delete_document_endpoint(
     document_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Delete a document and all associated chunks from DB and ChromaDB."""
     doc = await db.get(DBDocument, document_id)
-    if not doc:
+    if not doc or doc.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Document not found")
 
     success = await delete_document(document_id, db)

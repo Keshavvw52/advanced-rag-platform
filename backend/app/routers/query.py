@@ -11,11 +11,12 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
-from app.models.database import get_db, QueryHistory, Document as DBDocument
+from app.models.database import get_db, QueryHistory, Document as DBDocument, User
 from app.models.schemas import (
     QueryRequest, QueryResponse, CompareRequest, CompareResponse,
-    PipelineTrace, RetrievedChunk, StatsResponse
+    PipelineTrace, RetrievedChunk, StatsResponse, MetadataFilter
 )
+from app.services.auth import get_current_user
 from app.services.rag_chain import run_rag_pipeline, stream_rag_pipeline
 from app.services.llm_errors import llm_http_exception
 
@@ -27,6 +28,7 @@ router = APIRouter(prefix="/api", tags=["query"])
 async def query_documents(
     request: QueryRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Query documents using the selected retrieval strategy.
@@ -40,6 +42,7 @@ async def query_documents(
         )
 
     try:
+        request = _with_user_filter(request, current_user.id)
         result = await run_rag_pipeline(request)
     except Exception as exc:
         mapped = llm_http_exception(exc)
@@ -50,6 +53,7 @@ async def query_documents(
     # Persist query to history
     history = QueryHistory(
         id=result.query_id,
+        user_id=current_user.id,
         query=request.query,
         strategy=request.strategy.value,
         answer=result.answer,
@@ -70,13 +74,14 @@ async def query_documents(
 async def query_documents_stream(
     request: QueryRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Stream RAG response using Server-Sent Events (SSE).
     Yields: metadata chunk, then answer tokens, then done signal.
     """
     return StreamingResponse(
-        stream_rag_pipeline(request),
+        stream_rag_pipeline(_with_user_filter(request, current_user.id)),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -89,6 +94,7 @@ async def query_documents_stream(
 async def compare_strategies(
     request: CompareRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     A/B compare two retrieval strategies on the same query.
@@ -97,12 +103,12 @@ async def compare_strategies(
     req_a = QueryRequest(
         query=request.query,
         strategy=request.strategy_a,
-        filters=request.filters,
+        filters=_owned_filters(request.filters, current_user.id),
     )
     req_b = QueryRequest(
         query=request.query,
         strategy=request.strategy_b,
-        filters=request.filters,
+        filters=_owned_filters(request.filters, current_user.id),
     )
 
     try:
@@ -123,6 +129,7 @@ async def compare_strategies(
     for result in [result_a, result_b]:
         history = QueryHistory(
             id=result.query_id,
+            user_id=current_user.id,
             query=request.query,
             strategy=result.strategy,
             answer=result.answer,
@@ -147,10 +154,11 @@ async def compare_strategies(
 async def get_pipeline_trace(
     query_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Get the full pipeline trace for a past query."""
     history = await db.get(QueryHistory, query_id)
-    if not history:
+    if not history or history.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Query not found")
     if not history.pipeline_trace:
         raise HTTPException(status_code=404, detail="No pipeline trace for this query")
@@ -162,10 +170,11 @@ async def get_pipeline_trace(
 async def get_query_chunks(
     query_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Get the retrieved chunks for a past query."""
     history = await db.get(QueryHistory, query_id)
-    if not history:
+    if not history or history.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Query not found")
 
     trace = history.pipeline_trace or {}
@@ -225,36 +234,63 @@ async def list_strategies():
 
 
 @router.get("/stats", response_model=StatsResponse)
-async def get_stats(db: AsyncSession = Depends(get_db)):
+async def get_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Get platform usage statistics."""
     from app.models.database import DocumentChunk, EvaluationResult
 
     # Total documents
-    doc_count = await db.scalar(select(func.count()).select_from(DBDocument))
+    doc_count = await db.scalar(
+        select(func.count()).select_from(DBDocument).where(DBDocument.user_id == current_user.id)
+    )
 
     # Total chunks
-    chunk_count = await db.scalar(select(func.count()).select_from(DocumentChunk))
+    chunk_count = await db.scalar(
+        select(func.count())
+        .select_from(DocumentChunk)
+        .join(DBDocument, DocumentChunk.document_id == DBDocument.id)
+        .where(DBDocument.user_id == current_user.id)
+    )
 
     # Total queries
-    query_count = await db.scalar(select(func.count()).select_from(QueryHistory))
+    query_count = await db.scalar(
+        select(func.count()).select_from(QueryHistory).where(QueryHistory.user_id == current_user.id)
+    )
 
     # Avg latency
-    avg_latency = await db.scalar(select(func.avg(QueryHistory.latency_ms)))
+    avg_latency = await db.scalar(
+        select(func.avg(QueryHistory.latency_ms)).where(QueryHistory.user_id == current_user.id)
+    )
 
     # Total tokens
-    total_in = await db.scalar(select(func.sum(QueryHistory.input_tokens))) or 0
-    total_out = await db.scalar(select(func.sum(QueryHistory.output_tokens))) or 0
+    total_in = await db.scalar(
+        select(func.sum(QueryHistory.input_tokens)).where(QueryHistory.user_id == current_user.id)
+    ) or 0
+    total_out = await db.scalar(
+        select(func.sum(QueryHistory.output_tokens)).where(QueryHistory.user_id == current_user.id)
+    ) or 0
 
     # Chunks by strategy
     from sqlalchemy import text
     chunks_by_strategy_result = await db.execute(
-        text("SELECT strategy, COUNT(*) as cnt FROM document_chunks GROUP BY strategy")
+        text(
+            "SELECT c.strategy, COUNT(*) as cnt "
+            "FROM document_chunks c JOIN documents d ON c.document_id = d.id "
+            "WHERE d.user_id = :user_id GROUP BY c.strategy"
+        ),
+        {"user_id": current_user.id},
     )
     chunks_by_strategy = {row[0]: row[1] for row in chunks_by_strategy_result}
 
     # Queries by strategy
     queries_by_strategy_result = await db.execute(
-        text("SELECT strategy, COUNT(*) as cnt FROM query_history GROUP BY strategy")
+        text(
+            "SELECT strategy, COUNT(*) as cnt FROM query_history "
+            "WHERE user_id = :user_id GROUP BY strategy"
+        ),
+        {"user_id": current_user.id},
     )
     queries_by_strategy = {row[0]: row[1] for row in queries_by_strategy_result}
 
@@ -305,3 +341,13 @@ async def health_check(db: AsyncSession = Depends(get_db)):
         db_ok=db_ok,
         llm_ok=llm_ok,
     )
+
+
+def _owned_filters(filters: MetadataFilter | None, user_id: str) -> MetadataFilter:
+    if filters:
+        return filters.model_copy(update={"user_id": user_id})
+    return MetadataFilter(user_id=user_id)
+
+
+def _with_user_filter(request: QueryRequest, user_id: str) -> QueryRequest:
+    return request.model_copy(update={"filters": _owned_filters(request.filters, user_id)})

@@ -8,7 +8,7 @@ import json
 
 from sqlalchemy import (
     Column, String, Integer, Float, Boolean,
-    DateTime, Text, ForeignKey, JSON
+    DateTime, Text, ForeignKey, JSON, text
 )
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, relationship
@@ -22,12 +22,29 @@ class Base(DeclarativeBase):
     pass
 
 
+# ─── User Model ────────────────────────────────────────────────────────────────
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True)
+    email = Column(String, nullable=False, unique=True, index=True)
+    name = Column(String, nullable=True)
+    password_hash = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    documents = relationship("Document", back_populates="user")
+    queries = relationship("QueryHistory", back_populates="user")
+    evaluations = relationship("EvaluationResult", back_populates="user")
+
+
 # ─── Document Model ────────────────────────────────────────────────────────────
 
 class Document(Base):
     __tablename__ = "documents"
 
     id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)
     filename = Column(String, nullable=False)
     original_filename = Column(String, nullable=False)
     file_type = Column(String, nullable=False)        # pdf, txt, docx, md
@@ -45,6 +62,7 @@ class Document(Base):
     chunks_section = Column(Integer, default=0)
 
     # Relationships
+    user = relationship("User", back_populates="documents")
     chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
     queries = relationship("QueryHistory", back_populates="document")
 
@@ -82,6 +100,7 @@ class QueryHistory(Base):
     __tablename__ = "query_history"
 
     id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)
     document_id = Column(String, ForeignKey("documents.id"), nullable=True)
     query = Column(Text, nullable=False)
     strategy = Column(String, nullable=False)           # which retrieval strategy was used
@@ -102,6 +121,7 @@ class QueryHistory(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
+    user = relationship("User", back_populates="queries")
     document = relationship("Document", back_populates="queries")
     evaluation = relationship("EvaluationResult", back_populates="query", uselist=False)
 
@@ -112,6 +132,7 @@ class EvaluationResult(Base):
     __tablename__ = "evaluation_results"
 
     id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)
     query_id = Column(String, ForeignKey("query_history.id"), nullable=True)
     strategy = Column(String, nullable=False)
     question = Column(Text, nullable=False)
@@ -132,6 +153,7 @@ class EvaluationResult(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
+    user = relationship("User", back_populates="evaluations")
     query = relationship("QueryHistory", back_populates="evaluation")
 
 
@@ -156,6 +178,17 @@ async def init_db():
     os.makedirs(settings.DB_DIR, exist_ok=True)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await _ensure_column(conn, "documents", "user_id", "VARCHAR")
+        await _ensure_column(conn, "query_history", "user_id", "VARCHAR")
+        await _ensure_column(conn, "evaluation_results", "user_id", "VARCHAR")
+
+
+async def _ensure_column(conn, table_name: str, column_name: str, column_type: str):
+    """SQLite-friendly column migration for existing local databases."""
+    result = await conn.execute(text(f"PRAGMA table_info({table_name})"))
+    existing = {row[1] for row in result.fetchall()}
+    if column_name not in existing:
+        await conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"))
 
 
 async def get_db() -> AsyncSession:

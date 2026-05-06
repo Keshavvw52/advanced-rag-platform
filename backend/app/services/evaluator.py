@@ -342,6 +342,7 @@ async def load_eval_dataset(path: str = None) -> list[dict]:
 async def run_batch_evaluation(
     strategies: list[RetrievalStrategy],
     dataset_path: str = None,
+    filters=None,
 ) -> BatchEvaluationResponse:
     """
     Run full evaluation dataset against multiple strategies.
@@ -367,7 +368,7 @@ async def run_batch_evaluation(
 
         for strategy in strategies:
             try:
-                result = await evaluate_single(question, reference, strategy)
+                result = await evaluate_single(question, reference, strategy, filters=filters)
                 result_with_batch = result.model_copy()
                 all_results.append(result_with_batch)
                 strategy_metrics[strategy.value].append(result.metrics)
