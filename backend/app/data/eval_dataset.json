@@ -1,0 +1,146 @@
+{
+  "description": "Evaluation dataset for Advanced RAG Platform benchmarking",
+  "version": "1.0",
+  "questions": [
+    {
+      "id": "q1",
+      "question": "What is Retrieval Augmented Generation (RAG)?",
+      "reference_answer": "RAG is a technique that combines a retrieval system with a language model. Instead of relying solely on the model's training data, RAG first retrieves relevant documents from a knowledge base, then uses them as context for generation. This grounds the model's responses in factual, up-to-date information.",
+      "category": "conceptual",
+      "difficulty": "easy"
+    },
+    {
+      "id": "q2",
+      "question": "What are the main limitations of basic vector similarity search in RAG?",
+      "reference_answer": "Basic vector similarity search has several limitations: it may miss exact keyword matches (e.g., product codes, names), relies on embedding quality which can miss semantic nuances, cannot filter by metadata without additional setup, retrieves based on surface similarity rather than deep relevance, and has no way to handle complex multi-part questions effectively.",
+      "category": "technical",
+      "difficulty": "medium"
+    },
+    {
+      "id": "q3",
+      "question": "How does Reciprocal Rank Fusion (RRF) work?",
+      "reference_answer": "RRF merges multiple ranked result lists by computing a score for each document as the sum of 1/(k + rank_i) across all result lists, where k=60 is a constant and rank_i is the document's rank in list i. Documents appearing in multiple lists get higher scores. This combination leverages the strengths of different retrieval methods without requiring score normalization.",
+      "category": "technical",
+      "difficulty": "medium"
+    },
+    {
+      "id": "q4",
+      "question": "What is the difference between bi-encoder and cross-encoder models?",
+      "reference_answer": "Bi-encoders encode the query and document independently into vectors, enabling fast retrieval via similarity computation. Cross-encoders take the query and document together as input and produce a relevance score, which is more accurate but slower since each query-document pair must be processed jointly. In RAG, bi-encoders are used for initial retrieval and cross-encoders for reranking.",
+      "category": "technical",
+      "difficulty": "hard"
+    },
+    {
+      "id": "q5",
+      "question": "What is HyDE and why is it useful?",
+      "reference_answer": "HyDE (Hypothetical Document Embeddings) is a retrieval technique where the LLM first generates a hypothetical answer to the query, then that hypothetical answer is embedded and used for similarity search instead of the original query. This is useful because the hypothetical answer is closer in embedding space to real answers in the document corpus, often improving retrieval quality for abstract or conceptual queries.",
+      "category": "technical",
+      "difficulty": "medium"
+    },
+    {
+      "id": "q6",
+      "question": "What is parent-child chunking and what problem does it solve?",
+      "reference_answer": "Parent-child chunking creates two types of chunks: small child chunks (200 tokens) for precise retrieval and large parent chunks (1000 tokens) for full context. Retrieval is performed on child chunks to maximize precision, but the corresponding parent chunks are returned to the LLM to provide adequate context. This solves the tension between chunk size for retrieval (smaller is better) and chunk size for comprehension (larger is better).",
+      "category": "technical",
+      "difficulty": "medium"
+    },
+    {
+      "id": "q7",
+      "question": "What are the four RAG evaluation metrics and what does each measure?",
+      "reference_answer": "The four RAG evaluation metrics are: (1) Faithfulness - measures whether the answer contains only information supported by the retrieved context, detecting hallucinations; (2) Answer Relevancy - measures whether the answer is relevant to the question being asked; (3) Context Precision - measures whether the retrieved chunks are relevant and whether relevant chunks appear at higher ranks; (4) Context Recall - measures whether the retrieved context contains all information needed to answer the question, requires reference answers.",
+      "category": "evaluation",
+      "difficulty": "medium"
+    },
+    {
+      "id": "q8",
+      "question": "How does BM25 keyword search differ from semantic vector search?",
+      "reference_answer": "BM25 is a lexical/keyword search algorithm that scores documents based on term frequency and inverse document frequency. It excels at finding exact keyword matches but struggles with synonyms or paraphrasing. Semantic vector search encodes text into dense vector representations and finds conceptually similar content even with different wording, but may miss exact matches like specific codes or names. Hybrid search combines both approaches for better overall retrieval.",
+      "category": "technical",
+      "difficulty": "easy"
+    },
+    {
+      "id": "q9",
+      "question": "What is LangChain LCEL and why is it preferred over older chain patterns?",
+      "reference_answer": "LCEL (LangChain Expression Language) is a declarative way to compose LangChain components using the pipe operator (|). It is preferred because it: supports streaming out of the box, enables parallel execution, provides better type safety, supports async natively, is more readable and composable, and integrates seamlessly with LangSmith for tracing. The older LLMChain and SequentialChain patterns are deprecated.",
+      "category": "technical",
+      "difficulty": "medium"
+    },
+    {
+      "id": "q10",
+      "question": "What is query decomposition in RAG and when should you use it?",
+      "reference_answer": "Query decomposition breaks complex, multi-part questions into simpler sub-questions. For example, 'Compare pricing and features of Plan A vs Plan B' becomes four separate queries. Each sub-question is retrieved independently, and the results are synthesized into a comprehensive answer. It should be used for complex analytical questions, comparison queries, or multi-hop questions that require information from multiple sources.",
+      "category": "technical",
+      "difficulty": "medium"
+    },
+    {
+      "id": "q11",
+      "question": "What are the main chunking strategies and their trade-offs?",
+      "reference_answer": "The main chunking strategies are: (1) Recursive character splitting - simple, fast, works for most documents but ignores semantic boundaries; (2) Semantic chunking - preserves semantic coherence by splitting on embedding similarity drops, but computationally expensive; (3) Parent-child - optimizes both retrieval precision and context quality but doubles storage; (4) Section-based - preserves document structure best for structured documents but may create very uneven chunk sizes.",
+      "category": "technical",
+      "difficulty": "medium"
+    },
+    {
+      "id": "q12",
+      "question": "How does cross-encoder reranking improve retrieval precision?",
+      "reference_answer": "Cross-encoder reranking improves precision by taking the initial top-k retrieved chunks (typically 20) and scoring each query-document pair jointly through a cross-encoder model. Unlike bi-encoders that encode independently, the cross-encoder sees query and document together, allowing it to compute more accurate relevance scores. The chunks are then reordered by these scores and only the top-k (typically 5) are sent to the LLM, significantly improving precision.",
+      "category": "technical",
+      "difficulty": "hard"
+    },
+    {
+      "id": "q13",
+      "question": "What is metadata filtering in RAG and what types of filters are useful?",
+      "reference_answer": "Metadata filtering allows restricting retrieval to a subset of documents based on properties stored with each chunk. Useful filter types include: source document filter (search only in specific files), page range filter (specific pages in large documents), section header filter (only within a named section), date filter (by document creation or upload date), tag filter (by user-assigned categories), and chunk strategy filter (use only chunks from a specific chunking method). Filters can be combined with AND/OR logic.",
+      "category": "technical",
+      "difficulty": "easy"
+    },
+    {
+      "id": "q14",
+      "question": "What is step-back prompting and how does it improve retrieval?",
+      "reference_answer": "Step-back prompting generates a more general version of a specific query before retrieval. For example, 'What was revenue in Q3 2025?' becomes 'What are the financial results for 2025?'. Both the specific and general queries are used for retrieval, with the general query helping to find broader context that contains the specific answer. This improves recall for highly specific queries that might not match document vocabulary exactly.",
+      "category": "technical",
+      "difficulty": "medium"
+    },
+    {
+      "id": "q15",
+      "question": "What is faithfulness in RAG evaluation and how is it measured?",
+      "reference_answer": "Faithfulness measures whether the generated answer is grounded in the retrieved context without hallucination. It is measured by: extracting factual claims from the answer, checking each claim against the context to determine if it is supported, and computing faithfulness = supported_claims / total_claims. An LLM judge is typically used to extract and verify claims. A low faithfulness score indicates the model is generating information not present in the context.",
+      "category": "evaluation",
+      "difficulty": "medium"
+    },
+    {
+      "id": "q16",
+      "question": "Why does hybrid search generally outperform pure semantic search?",
+      "reference_answer": "Hybrid search outperforms pure semantic search because different queries benefit from different retrieval paradigms. Semantic search fails on exact matches (error codes, names, numbers) while BM25 keyword search fails on conceptual queries (synonyms, paraphrasing). By combining both via Reciprocal Rank Fusion, hybrid search captures documents that excel in either semantic similarity or keyword relevance, resulting in a merged ranking that leverages both strengths.",
+      "category": "technical",
+      "difficulty": "easy"
+    },
+    {
+      "id": "q17",
+      "question": "What is ChromaDB and why is it suitable for RAG applications?",
+      "reference_answer": "ChromaDB is an open-source vector database designed for AI applications. It is suitable for RAG because it: stores embeddings alongside document text and metadata, supports similarity search with configurable distance metrics, enables metadata filtering during retrieval, has a simple Python API, supports persistent storage, and integrates natively with LangChain. It is easy to run locally without infrastructure setup.",
+      "category": "technical",
+      "difficulty": "easy"
+    },
+    {
+      "id": "q18",
+      "question": "What is context precision and how does rank affect the score?",
+      "reference_answer": "Context precision measures whether retrieved chunks are actually relevant to answering the question. It is rank-aware, meaning relevant chunks appearing at higher ranks (rank 1, 2) contribute more to the score than relevant chunks at lower ranks (rank 10, 20). This reflects the practical reality that LLMs give more attention to content at the beginning of context windows. A high precision score means the most relevant content was retrieved and ranked first.",
+      "category": "evaluation",
+      "difficulty": "hard"
+    },
+    {
+      "id": "q19",
+      "question": "What are the trade-offs between chunk size in RAG?",
+      "reference_answer": "Smaller chunks provide higher retrieval precision (the exact answer is more likely to be in a small chunk) but may lack sufficient context for the LLM to generate a good answer. Larger chunks provide more context but reduce retrieval precision (the relevant content is diluted among more text). The parent-child chunking strategy directly addresses this trade-off by retrieving small chunks but returning large parent chunks to the LLM.",
+      "category": "technical",
+      "difficulty": "medium"
+    },
+    {
+      "id": "q20",
+      "question": "What is the role of sentence-transformers in a RAG system?",
+      "reference_answer": "Sentence-transformers (like all-MiniLM-L6-v2) serve two roles in RAG. First, as the embedding model that converts text (both documents and queries) into dense vector representations for semantic search. Second, as the cross-encoder for reranking (using models like ms-marco-MiniLM-L-6-v2) which jointly encodes query-document pairs to produce precise relevance scores. They are efficient, accurate, and can run locally without API costs.",
+      "category": "technical",
+      "difficulty": "medium"
+    }
+  ]
+}
