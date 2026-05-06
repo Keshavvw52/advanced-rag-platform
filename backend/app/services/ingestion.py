@@ -265,7 +265,20 @@ async def delete_document(document_id: str, db: AsyncSession) -> bool:
         return False
 
 
-def get_bm25_corpus(document_id: str = None, user_id: str = None) -> tuple[list[str], list[dict]]:
+def build_bm25_where(document_id: str = None, user_id: str = None) -> dict:
+    """Build a Chroma-compatible filter for the BM25 corpus."""
+    conditions = [{"strategy": {"$eq": "recursive"}}]
+    if document_id:
+        conditions.append({"document_id": {"$eq": document_id}})
+    if user_id:
+        conditions.append({"user_id": {"$eq": user_id}})
+
+    if len(conditions) == 1:
+        return conditions[0]
+    return {"$and": conditions}
+
+
+def get_bm25_corpus(document_id: str = None, user_id: str = None) -> tuple[list[str], list[dict], list[str]]:
     """
     Retrieve text corpus from ChromaDB for BM25 index building.
     Optionally filtered to a specific document.
@@ -273,14 +286,8 @@ def get_bm25_corpus(document_id: str = None, user_id: str = None) -> tuple[list[
     """
     chroma = get_chroma_client()
 
-    where_filter = {"strategy": "recursive"}  # Use recursive chunks for BM25
-    if document_id:
-        where_filter["document_id"] = document_id
-    if user_id:
-        where_filter["user_id"] = user_id
-
     results = chroma.get(
-        where=where_filter,
+        where=build_bm25_where(document_id=document_id, user_id=user_id),
         include=["documents", "metadatas"],
     )
 

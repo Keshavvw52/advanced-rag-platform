@@ -48,7 +48,8 @@ async def query_documents(
         mapped = llm_http_exception(exc)
         if mapped:
             raise mapped
-        raise
+        logger.exception("Query failed for strategy %s", request.strategy.value)
+        raise HTTPException(status_code=500, detail=f"Query failed: {exc}") from exc
 
     # Persist query to history
     history = QueryHistory(
@@ -118,7 +119,8 @@ async def compare_strategies(
         mapped = llm_http_exception(exc)
         if mapped:
             raise mapped
-        raise
+        logger.exception("Strategy comparison failed")
+        raise HTTPException(status_code=500, detail=f"Query failed: {exc}") from exc
 
     # Find overlap in retrieved chunks
     ids_a = {c.chunk_id for c in result_a.retrieved_chunks}
