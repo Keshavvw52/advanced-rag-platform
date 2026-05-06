@@ -1,4 +1,27 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/+$/, "");
+const TOKEN_KEY = "rag_access_token";
+
+function getStoredToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(TOKEN_KEY);
+}
+
+export function setStoredToken(token: string | null) {
+  if (typeof window === "undefined") return;
+  if (token) {
+    window.localStorage.setItem(TOKEN_KEY, token);
+  } else {
+    window.localStorage.removeItem(TOKEN_KEY);
+  }
+}
+
+function authHeaders(headers?: HeadersInit): HeadersInit {
+  const token = getStoredToken();
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...headers,
+  };
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -106,6 +129,18 @@ export interface EvaluationMetrics {
   average: number;
 }
 
+export interface UserResponse {
+  id: string;
+  email: string;
+  name?: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: UserResponse;
+}
+
 export interface EvaluationResponse {
   id: string;
   question: string;
@@ -139,7 +174,7 @@ export interface BatchEvaluationResponse {
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...options.headers },
+    headers: authHeaders({ "Content-Type": "application/json", ...options.headers }),
     ...options,
   });
 
@@ -148,6 +183,10 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     try {
       error = await res.json();
     } catch {}
+
+    if (res.status === 401) {
+      setStoredToken(null);
+    }
 
     throw new Error(
       error?.detail ||
@@ -159,6 +198,39 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   return res.json();
 }
 
+export const authApi = {
+  signup: async (params: {
+    email: string;
+    password: string;
+    name?: string;
+  }): Promise<AuthResponse> => {
+    const response = await apiFetch<AuthResponse>("/api/auth/signup", {
+      method: "POST",
+      body: JSON.stringify(params),
+    });
+    setStoredToken(response.access_token);
+    return response;
+  },
+
+  login: async (params: {
+    email: string;
+    password: string;
+  }): Promise<AuthResponse> => {
+    const response = await apiFetch<AuthResponse>("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify(params),
+    });
+    setStoredToken(response.access_token);
+    return response;
+  },
+
+  me: (): Promise<UserResponse> => apiFetch("/api/auth/me"),
+
+  logout: () => setStoredToken(null),
+
+  token: getStoredToken,
+};
+
 // ─── Documents API ────────────────────────────────────────────────────────────
 
 export const documentsApi = {
@@ -168,6 +240,7 @@ export const documentsApi = {
     formData.append("tags", tags);
     const res = await fetch(`${API_BASE}/api/documents/upload`, {
       method: "POST",
+      headers: authHeaders(),
       body: formData,
     });
     if (!res.ok) {
@@ -233,6 +306,10 @@ export const queryApi = {
     // Note: EventSource doesn't support POST, so we use a workaround
     // In production, use a POST-based SSE library
     const url = new URL(`${API_BASE}/api/query/stream`);
+    const token = getStoredToken();
+    if (token) {
+      url.searchParams.set("token", token);
+    }
     return new EventSource(url.toString());
   },
 };

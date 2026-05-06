@@ -30,6 +30,26 @@ class DocumentStatus(str, Enum):
     FAILED = "failed"
 
 
+# ─── Auth Schemas ──────────────────────────────────────────────────────────────
+
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    name: Optional[str] = None
+
+
+class AuthRequest(BaseModel):
+    email: str = Field(..., min_length=3, max_length=255)
+    password: str = Field(..., min_length=6, max_length=128)
+    name: Optional[str] = Field(None, max_length=120)
+
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+
 # ─── Document Schemas ──────────────────────────────────────────────────────────
 
 class DocumentUploadResponse(BaseModel):
@@ -94,6 +114,7 @@ class MetadataFilter(BaseModel):
     tags: Optional[list[str]] = Field(None, description="Filter by document tags")
     chunk_strategy: Optional[ChunkStrategy] = Field(None, description="Filter by chunk strategy")
     document_ids: Optional[list[str]] = Field(None, description="Restrict to specific document IDs")
+    user_id: Optional[str] = Field(None, description="Internal user ownership filter")
 
 
 class QueryRequest(BaseModel):

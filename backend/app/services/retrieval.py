@@ -64,6 +64,9 @@ def build_chroma_where(filters: Optional[MetadataFilter]) -> Optional[dict]:
     if filters.document_ids:
         conditions.append({"document_id": {"$in": filters.document_ids}})
 
+    if filters.user_id:
+        conditions.append({"user_id": {"$eq": filters.user_id}})
+
     if filters.tags:
         # Tags are stored as comma-separated string in ChromaDB
         # Use $in with the tags list (partial match workaround)
@@ -179,7 +182,7 @@ async def bm25_search(
     top_k = top_k or settings.RETRIEVAL_TOP_K
 
     # Fetch corpus from ChromaDB
-    texts, metadatas, ids = get_bm25_corpus()
+    texts, metadatas, ids = get_bm25_corpus(user_id=filters.user_id if filters else None)
 
     if not texts:
         logger.warning("BM25: Empty corpus, returning empty results")
@@ -195,6 +198,8 @@ async def bm25_search(
                 if meta.get("strategy") != filters.chunk_strategy.value:
                     continue
             if filters.document_ids and meta.get("document_id") not in filters.document_ids:
+                continue
+            if filters.user_id and meta.get("user_id") != filters.user_id:
                 continue
             filtered.append((text, meta, id_))
         if filtered:

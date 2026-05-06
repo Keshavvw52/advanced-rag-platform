@@ -6,12 +6,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.models.database import get_db, EvaluationResult as DBEval
+from app.models.database import get_db, EvaluationResult as DBEval, User
 from app.models.schemas import (
     EvaluationRequest, EvaluationResponse,
     BatchEvaluationRequest, BatchEvaluationResponse,
-    RetrievalStrategy
+    RetrievalStrategy, MetadataFilter
 )
+from app.services.auth import get_current_user
 from app.services.evaluator import evaluate_single, run_batch_evaluation
 from app.services.llm_errors import llm_http_exception
 
@@ -23,6 +24,7 @@ router = APIRouter(prefix="/api/evaluate", tags=["evaluation"])
 async def evaluate_query(
     request: EvaluationRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Evaluate a single question-answer pair."""
     try:
@@ -30,7 +32,7 @@ async def evaluate_query(
             question=request.question,
             reference_answer=request.reference_answer,
             strategy=request.strategy,
-            filters=request.filters,
+            filters=_owned_filters(request.filters, current_user.id),
         )
     except Exception as exc:
         mapped = llm_http_exception(exc)
@@ -41,6 +43,7 @@ async def evaluate_query(
     # Persist evaluation result
     db_eval = DBEval(
         id=result.id,
+        user_id=current_user.id,
         strategy=result.strategy,
         question=result.question,
         reference_answer=result.reference_answer,
@@ -62,18 +65,21 @@ async def evaluate_query(
 async def batch_evaluate(
     request: BatchEvaluationRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Run batch evaluation across multiple strategies."""
     try:
         result = await run_batch_evaluation(
             strategies=request.strategies,
             dataset_path=request.dataset_path,
+            filters=_owned_filters(None, current_user.id),
         )
 
         # Persist all results
         for item in result.per_question_results:
             db_eval = DBEval(
                 id=item.id,
+                user_id=current_user.id,
                 strategy=item.strategy,
                 question=item.question,
                 reference_answer=item.reference_answer,
@@ -102,9 +108,15 @@ async def get_evaluation_results(
     strategy: str = None,
     limit: int = 50,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Get past evaluation results."""
-    query = select(DBEval).order_by(DBEval.created_at.desc()).limit(limit)
+    query = (
+        select(DBEval)
+        .where(DBEval.user_id == current_user.id)
+        .order_by(DBEval.created_at.desc())
+        .limit(limit)
+    )
     if strategy:
         query = query.where(DBEval.strategy == strategy)
 
@@ -134,3 +146,9 @@ async def get_evaluation_results(
         )
         for e in evals
     ]
+
+
+def _owned_filters(filters: MetadataFilter | None, user_id: str) -> MetadataFilter:
+    if filters:
+        return filters.model_copy(update={"user_id": user_id})
+    return MetadataFilter(user_id=user_id)

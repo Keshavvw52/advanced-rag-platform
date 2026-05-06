@@ -89,6 +89,7 @@ def load_document(file_path: str, file_type: str) -> list[Document]:
 def enrich_document_metadata(
     documents: list[Document],
     document_id: str,
+    user_id: str,
     filename: str,
     file_type: str,
     tags: list[str],
@@ -101,6 +102,7 @@ def enrich_document_metadata(
     for doc in documents:
         doc.metadata.update({
             "document_id": document_id,
+            "user_id": user_id,
             "filename": filename,
             "file_type": file_type,
             "tags": ",".join(tags),  # ChromaDB requires string values
@@ -125,6 +127,7 @@ async def ingest_document(
     file_type: str,
     file_size: int,
     tags: list[str],
+    user_id: str,
     db: AsyncSession,
 ) -> DBDocument:
     """
@@ -146,7 +149,7 @@ async def ingest_document(
 
     # ── Step 2: Metadata enrichment ──
     enriched_docs = enrich_document_metadata(
-        raw_documents, document_id, filename, file_type, tags, upload_date
+        raw_documents, document_id, user_id, filename, file_type, tags, upload_date
     )
 
     # ── Step 3: Run all chunking strategies ──
@@ -262,7 +265,7 @@ async def delete_document(document_id: str, db: AsyncSession) -> bool:
         return False
 
 
-def get_bm25_corpus(document_id: str = None) -> tuple[list[str], list[dict]]:
+def get_bm25_corpus(document_id: str = None, user_id: str = None) -> tuple[list[str], list[dict]]:
     """
     Retrieve text corpus from ChromaDB for BM25 index building.
     Optionally filtered to a specific document.
@@ -273,6 +276,8 @@ def get_bm25_corpus(document_id: str = None) -> tuple[list[str], list[dict]]:
     where_filter = {"strategy": "recursive"}  # Use recursive chunks for BM25
     if document_id:
         where_filter["document_id"] = document_id
+    if user_id:
+        where_filter["user_id"] = user_id
 
     results = chroma.get(
         where=where_filter,

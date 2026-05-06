@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings
 from pydantic import Field, field_validator
 from functools import lru_cache
 from pathlib import Path
+import secrets
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 
@@ -15,6 +16,12 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
     CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    CORS_ORIGIN_REGEX: str = r"^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$"
+    JWT_SECRET_KEY: str = Field(
+        default_factory=lambda: secrets.token_urlsafe(32),
+        description="Secret used to sign authentication tokens",
+    )
+    JWT_EXPIRE_MINUTES: int = 60 * 24 * 7
 
     # --- Database ---
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/rag_platform.db"

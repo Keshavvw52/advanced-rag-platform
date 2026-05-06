@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.models.database import init_db
-from app.routers import documents, query, evaluation
+from app.routers import auth, documents, query, evaluation
 
 # Configure logging
 logging.basicConfig(
@@ -73,6 +73,7 @@ Advanced RAG Platform with:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
+    allow_origin_regex=settings.CORS_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -80,6 +81,7 @@ app.add_middleware(
 
 # ─── Routers ──────────────────────────────────────────────────────────────────
 
+app.include_router(auth.router)
 app.include_router(documents.router)
 app.include_router(query.router)
 app.include_router(evaluation.router)

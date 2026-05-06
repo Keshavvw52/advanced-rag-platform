@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { BarChart2, FileText, GitCompare, Home, Search, Sparkles } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { BarChart2, FileText, GitCompare, Home, LogOut, Search, Sparkles, User } from "lucide-react";
+import { authApi, UserResponse } from "@/lib/api";
 
 const NAV_LINKS = [
   { href: "/", label: "Home", icon: Home },
@@ -12,8 +13,14 @@ const NAV_LINKS = [
   { href: "/evaluate", label: "Evaluate", icon: BarChart2 },
 ];
 
-export function SideNav() {
+export function SideNav({ user }: { user?: UserResponse | null }) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    authApi.logout();
+    router.replace("/auth");
+  };
 
   return (
     <aside className="md-panel relative flex h-[calc(100vh-2rem)] w-full max-w-[290px] flex-col overflow-hidden p-4">
@@ -63,10 +70,24 @@ export function SideNav() {
         })}
       </nav>
 
-      <div className="relative rounded-[24px] bg-[rgb(var(--md-secondary)/0.7)] p-4 text-sm text-[rgb(var(--md-secondary-ink))]">
-        <p className="font-medium">Model stack</p>
-        <p className="mt-1 text-xs text-[rgb(var(--md-ink-soft))]">Groq llama-3.3 versatile</p>
-        <p className="text-xs text-[rgb(var(--md-ink-soft))]">ChromaDB + all-MiniLM-L6-v2</p>
+      <div className="relative space-y-3 rounded-[24px] bg-[rgb(var(--md-secondary)/0.7)] p-4 text-sm text-[rgb(var(--md-secondary-ink))]">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[rgb(var(--md-surface-high))] text-[rgb(var(--md-primary-strong))]">
+            <User className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate font-medium">{user?.name || "Your workspace"}</p>
+            <p className="truncate text-xs text-[rgb(var(--md-ink-soft))]">{user?.email}</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="flex w-full items-center justify-center gap-2 rounded-full bg-[rgb(var(--md-surface-high)/0.8)] px-4 py-2 text-xs font-medium text-[rgb(var(--md-ink))] transition hover:bg-[rgb(var(--md-surface-high))]"
+        >
+          <LogOut className="h-3.5 w-3.5" />
+          Sign out
+        </button>
       </div>
     </aside>
   );
