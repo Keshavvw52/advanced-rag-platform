@@ -1,7 +1,5 @@
 import logging
-from typing import Optional
-
-from sentence_transformers import CrossEncoder
+from typing import Optional, Any
 
 from app.config import get_settings
 from app.services.retrieval import ScoredChunk
@@ -10,13 +8,15 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 # Singleton cross-encoder model
-_cross_encoder: Optional[CrossEncoder] = None
+_cross_encoder: Optional[Any] = None
 
 
-def get_cross_encoder() -> CrossEncoder:
+def get_cross_encoder() -> Any:
     """Return or initialize the CrossEncoder singleton."""
     global _cross_encoder
     if _cross_encoder is None:
+        from sentence_transformers import CrossEncoder
+
         logger.info(f"Loading cross-encoder: {settings.RERANKER_MODEL}")
         _cross_encoder = CrossEncoder(
             settings.RERANKER_MODEL,
@@ -46,6 +46,12 @@ async def rerank_chunks(
 
     if not chunks:
         return []
+
+    if not settings.RERANKER_ENABLED:
+        logger.info("Reranker disabled; returning retrieved chunks without cross-encoder scoring")
+        for i, chunk in enumerate(chunks[:top_k]):
+            chunk.reranked_rank = i + 1
+        return chunks[:top_k]
 
     cross_encoder = get_cross_encoder()
 
