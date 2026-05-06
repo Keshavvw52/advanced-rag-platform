@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -21,7 +21,7 @@ const BENEFITS = [
   "Compare strategies inside your private workspace",
 ];
 
-export default function AuthPage() {
+function AuthContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [mode, setMode] = useState<Mode>("login");
@@ -214,5 +214,19 @@ export default function AuthPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="grid min-h-[calc(100vh-2rem)] flex-1 place-items-center text-sm text-[rgb(var(--md-ink-soft))]">
+          Loading account...
+        </main>
+      }
+    >
+      <AuthContent />
+    </Suspense>
   );
 }
