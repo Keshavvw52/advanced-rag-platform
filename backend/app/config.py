@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings
 from pydantic import Field, field_validator
 from functools import lru_cache
 from pathlib import Path
+import json
 import secrets
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -15,7 +16,11 @@ class Settings(BaseSettings):
     APP_NAME: str = "Advanced RAG Platform"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
-    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    CORS_ORIGINS: list[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://advanced-rag-platform.vercel.app",
+    ]
     CORS_ORIGIN_REGEX: str = r"^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$"
     JWT_SECRET_KEY: str = Field(
         default_factory=lambda: secrets.token_urlsafe(32),
@@ -77,6 +82,21 @@ class Settings(BaseSettings):
                 return True
             if normalized in {"prod", "production", "release"}:
                 return False
+        return value
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value: object) -> object:
+        if isinstance(value, str):
+            normalized = value.strip()
+            if not normalized:
+                return []
+            try:
+                return json.loads(normalized)
+            except json.JSONDecodeError:
+                return [origin.strip().rstrip("/") for origin in normalized.split(",") if origin.strip()]
+        if isinstance(value, list):
+            return [origin.rstrip("/") if isinstance(origin, str) else origin for origin in value]
         return value
 
     class Config:
