@@ -1,0 +1,202 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --md-background: 255 251 254;
+  --md-surface: 243 237 247;
+  --md-surface-low: 231 224 236;
+  --md-surface-high: 255 255 255;
+  --md-primary: 103 80 164;
+  --md-primary-strong: 79 55 139;
+  --md-secondary: 232 222 248;
+  --md-secondary-ink: 29 25 43;
+  --md-tertiary: 125 82 96;
+  --md-outline: 121 116 126;
+  --md-ink: 28 27 31;
+  --md-ink-soft: 73 69 79;
+  --md-success: 35 110 60;
+  --md-error: 179 38 30;
+  --md-shadow: 28 27 31;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    color: rgb(var(--md-ink));
+    background:
+      radial-gradient(circle at top right, rgb(var(--md-secondary) / 0.65), transparent 28%),
+      radial-gradient(circle at 20% 20%, rgb(var(--md-primary) / 0.12), transparent 24%),
+      linear-gradient(180deg, rgb(var(--md-background)) 0%, rgb(var(--md-surface-low) / 0.55) 100%);
+    min-height: 100vh;
+  }
+
+  * {
+    border-color: rgb(var(--md-outline) / 0.2);
+  }
+
+  *:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgb(var(--md-primary) / 0.7);
+  }
+
+  ::selection {
+    background: rgb(var(--md-primary) / 0.18);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgb(var(--md-surface-low) / 0.45);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--md-outline) / 0.45);
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--md-primary) / 0.45);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation: none !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  .md-shell {
+    @apply min-h-screen;
+    background:
+      radial-gradient(circle at top left, rgb(var(--md-primary) / 0.14), transparent 20%),
+      radial-gradient(circle at bottom right, rgb(var(--md-tertiary) / 0.1), transparent 24%);
+  }
+
+  .md-panel {
+    @apply rounded-[32px] border shadow-sm;
+    background: rgb(var(--md-surface) / 0.9);
+    box-shadow:
+      0 1px 3px rgb(var(--md-shadow) / 0.08),
+      0 12px 32px rgb(var(--md-shadow) / 0.06);
+  }
+
+  .md-card {
+    @apply rounded-[24px] border shadow-sm transition-all duration-300;
+    background: rgb(var(--md-surface) / 0.92);
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+    box-shadow:
+      0 1px 2px rgb(var(--md-shadow) / 0.08),
+      0 8px 24px rgb(var(--md-shadow) / 0.05);
+  }
+
+  .md-card-hover {
+    @apply hover:scale-[1.02] hover:shadow-md;
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  .md-pill {
+    @apply rounded-full px-4 py-2 text-sm font-medium transition-all duration-300 active:scale-95;
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  .md-button-primary {
+    @apply md-pill text-white shadow-sm hover:shadow-md;
+    background: rgb(var(--md-primary));
+  }
+
+  .md-button-primary:hover {
+    background: rgb(var(--md-primary) / 0.9);
+  }
+
+  .md-button-primary:active {
+    background: rgb(var(--md-primary) / 0.8);
+  }
+
+  .md-button-tonal {
+    @apply md-pill;
+    color: rgb(var(--md-secondary-ink));
+    background: rgb(var(--md-secondary));
+  }
+
+  .md-button-tonal:hover {
+    background: rgb(var(--md-secondary) / 0.85);
+  }
+
+  .md-button-outlined {
+    @apply md-pill border;
+    color: rgb(var(--md-primary));
+    background: rgb(var(--md-background) / 0.55);
+  }
+
+  .md-button-outlined:hover {
+    background: rgb(var(--md-primary) / 0.08);
+  }
+
+  .md-input {
+    @apply w-full border-b-2 border-t border-x border-transparent px-4 py-4 text-sm transition-all duration-200;
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    color: rgb(var(--md-ink));
+    background: rgb(var(--md-surface-low));
+    border-bottom-color: rgb(var(--md-outline) / 0.55);
+  }
+
+  .md-input::placeholder {
+    color: rgb(var(--md-ink-soft) / 0.65);
+  }
+
+  .md-input:focus {
+    border-bottom-color: rgb(var(--md-primary));
+    box-shadow: inset 0 -1px 0 rgb(var(--md-primary));
+  }
+
+  .md-chip {
+    @apply inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium;
+    background: rgb(var(--md-secondary));
+    color: rgb(var(--md-secondary-ink));
+  }
+
+  .md-subtle {
+    color: rgb(var(--md-ink-soft));
+  }
+
+  .md-glass {
+    @apply border rounded-[28px] backdrop-blur-sm;
+    background: rgb(var(--md-surface-high) / 0.45);
+    border-color: rgb(var(--md-surface-high) / 0.3);
+  }
+
+  .md-blur-orb {
+    @apply absolute rounded-full blur-3xl pointer-events-none;
+  }
+
+  .prose {
+    color: rgb(var(--md-ink));
+  }
+
+  .prose pre {
+    background: rgb(var(--md-surface-low));
+    border: 1px solid rgb(var(--md-outline) / 0.18);
+    border-radius: 20px;
+    color: rgb(var(--md-ink));
+  }
+
+  .prose code {
+    background: rgb(var(--md-secondary) / 0.8);
+    border-radius: 9999px;
+    padding: 0.15rem 0.45rem;
+    color: rgb(var(--md-secondary-ink));
+  }
+}
