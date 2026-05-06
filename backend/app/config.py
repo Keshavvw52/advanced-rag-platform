@@ -3,6 +3,8 @@ from pydantic import Field, field_validator
 from functools import lru_cache
 from pathlib import Path
 
+BASE_DIR = Path(__file__).resolve().parents[1]
+
 
 class Settings(BaseSettings):
     # --- API Keys ---
@@ -23,10 +25,13 @@ class Settings(BaseSettings):
     CHROMA_COLLECTION_NAME: str = "rag_documents"
 
     # --- Embeddings ---
+    EMBEDDING_PROVIDER: str = "hashing"
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
     EMBEDDING_DEVICE: str = "cpu"
+    EMBEDDING_DIMENSION: int = 384
 
     # --- Reranker ---
+    RERANKER_ENABLED: bool = False
     RERANKER_MODEL: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     RERANKER_TOP_K: int = 5
     RETRIEVAL_TOP_K: int = 20
@@ -68,7 +73,7 @@ class Settings(BaseSettings):
         return value
 
     class Config:
-        env_file = ".env"
+        env_file = BASE_DIR / ".env"
         case_sensitive = True
 
 

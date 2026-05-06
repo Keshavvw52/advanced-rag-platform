@@ -5,11 +5,12 @@ from typing import Optional
 from dataclasses import dataclass, field
 
 from langchain_core.documents import Document
+from langchain_core.embeddings import Embeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_experimental.text_splitter import SemanticChunker
-from langchain_huggingface import HuggingFaceEmbeddings
 
 from app.config import get_settings
+from app.services.embeddings import create_embeddings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -90,7 +91,7 @@ def recursive_chunking(
 def semantic_chunking(
     documents: list[Document],
     document_id: str,
-    embeddings: Optional[HuggingFaceEmbeddings] = None,
+    embeddings: Optional[Embeddings] = None,
 ) -> ChunkResult:
     """
     SemanticChunker splits on embedding similarity thresholds.
@@ -98,10 +99,7 @@ def semantic_chunking(
     A new chunk starts when similarity drops below threshold.
     """
     if embeddings is None:
-        embeddings = HuggingFaceEmbeddings(
-            model_name=settings.EMBEDDING_MODEL,
-            model_kwargs={"device": settings.EMBEDDING_DEVICE},
-        )
+        embeddings = create_embeddings()
 
     splitter = SemanticChunker(
         embeddings=embeddings,
@@ -272,7 +270,7 @@ def chunk_documents(
     documents: list[Document],
     document_id: str,
     strategies: list[str] = None,
-    embeddings: Optional[HuggingFaceEmbeddings] = None,
+    embeddings: Optional[Embeddings] = None,
 ) -> dict[str, ChunkResult]:
     """
     Run all (or specified) chunking strategies on a document list.

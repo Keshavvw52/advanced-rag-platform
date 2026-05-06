@@ -13,7 +13,7 @@ from langchain_community.document_loaders import (
     UnstructuredMarkdownLoader,
 )
 from langchain_chroma import Chroma
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_core.embeddings import Embeddings
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -21,25 +21,21 @@ from sqlalchemy import select
 from app.config import get_settings
 from app.models.database import Document as DBDocument, DocumentChunk as DBChunk
 from app.services.chunking_strategies import chunk_documents
+from app.services.embeddings import create_embeddings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-# Singleton embeddings (expensive to initialize)
-_embeddings: HuggingFaceEmbeddings = None
+# Singleton embeddings
+_embeddings: Embeddings = None
 _chroma_client: Chroma = None
 
 
-def get_embeddings() -> HuggingFaceEmbeddings:
-    """Return or initialize the embedding model singleton."""
+def get_embeddings() -> Embeddings:
+    """Return or initialize the embedding backend singleton."""
     global _embeddings
     if _embeddings is None:
-        logger.info(f"Loading embedding model: {settings.EMBEDDING_MODEL}")
-        _embeddings = HuggingFaceEmbeddings(
-            model_name=settings.EMBEDDING_MODEL,
-            model_kwargs={"device": settings.EMBEDDING_DEVICE},
-            encode_kwargs={"normalize_embeddings": True},
-        )
+        _embeddings = create_embeddings()
     return _embeddings
 
 
@@ -246,7 +242,13 @@ async def delete_document(document_id: str, db: AsyncSession) -> bool:
         chroma = get_chroma_client()
 
         # Delete all chunks for this document from ChromaDB
-        chroma.delete(where={"document_id": document_id})
+        results = chroma.get(
+            where={"document_id": document_id},
+            include=[],
+        )
+        chunk_ids = results.get("ids", []) or []
+        if chunk_ids:
+            chroma.delete(ids=chunk_ids)
 
         # Delete from SQLite (cascade handles chunks)
         db_doc = await db.get(DBDocument, document_id)
