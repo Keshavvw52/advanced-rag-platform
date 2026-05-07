@@ -4,6 +4,7 @@ Advanced RAG Platform is a full-stack document retrieval workspace with:
 
 - a FastAPI backend for ingestion, retrieval, reranking, and evaluation
 - a Next.js frontend for querying, document management, A/B comparison, and evaluation
+- account-based workspaces so each user's documents, queries, and evaluation history stay scoped to their login
 
 ## Repo Structure
 
