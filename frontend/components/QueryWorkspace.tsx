@@ -102,7 +102,14 @@ export function QueryWorkspace() {
             </section>
           )}
 
-          <section className="md-panel relative mt-auto shrink-0 overflow-hidden p-6">
+          {!result && !isLoading && (
+            <section className="md-panel min-h-0 flex-1 p-6">
+              <div className="mb-4 text-sm text-[rgb(var(--md-ink-soft))]">Ask a question to see results.</div>
+              <AnswerDisplay result={result} isLoading={isLoading} />
+            </section>
+          )}
+
+          <section className="md-panel relative shrink-0 overflow-hidden p-6">
             <div aria-hidden="true" className="md-blur-orb right-[-4rem] top-[-4rem] h-40 w-40 bg-[rgb(var(--md-secondary)/0.45)]" />
             <div className="relative">
               <div className="flex flex-col gap-4 xl:flex-row">
